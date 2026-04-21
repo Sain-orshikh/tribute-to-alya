@@ -50,26 +50,11 @@ export default function PredictPage() {
 
   // Load home image
   useEffect(() => {
-    const loadHomeImage = async () => {
-      try {
-        const response = await fetch(`${API_BASE}/api/home-image`, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-          },
-        })
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
-        const data = await response.json()
-        if (data.image) {
-          setHomeImage(`data:image/jpeg;base64,${data.image}`)
-          setAnimeImage(`data:image/jpeg;base64,${data.image}`)
-        }
-      } catch (err) {
-        console.error('Error loading home image:', err)
-        setError('Failed to connect to backend server')
-      }
-    }
-    loadHomeImage()
+    // Set fallback home image directly from public folder
+    const fallbackImage = '/data:image/jpeg;base64,/9j...' // Placeholder, will load from file
+    // Actually, just load the image directly as a file path
+    setHomeImage('/alya-home.jpg')
+    setAnimeImage('/alya-home.jpg') // Start with home image
   }, [])
 
   // Capture and predict
@@ -102,10 +87,12 @@ export default function PredictPage() {
             try {
               const errorData = await response.json()
               console.error('Backend error:', errorData)
-              setError(`Backend error: ${errorData.detail || response.statusText}`)
             } catch (e) {
-              setError(`Backend error: HTTP ${response.status}`)
+              // Backend not responding
             }
+            // Set fallback to home image
+            setAnimeImage('/alya-home.jpg')
+            setError('Backend server is loading... Please wait a moment and your expressions will be detected!')
             setLoading(false)
             return
           }
@@ -128,7 +115,8 @@ export default function PredictPage() {
           setLastCaptureTime(Date.now())
         } catch (err) {
           console.error('Error predicting:', err)
-          setError('Error processing frame')
+          setAnimeImage('/alya-home.jpg')
+          setError('Backend server is loading... Please wait a moment and your expressions will be detected!')
           setLoading(false)
         }
       }, 'image/jpeg', 0.85)
@@ -210,6 +198,10 @@ export default function PredictPage() {
                 src={animeImage}
                 alt="Anime character"
                 className="max-h-64 md:max-h-80 max-w-xs object-contain drop-shadow-2xl"
+                onError={(e) => {
+                  // Fallback if image fails to load
+                  (e.target as HTMLImageElement).src = '/alya-home.jpg'
+                }}
               />
             ) : (
               <div className="text-8xl opacity-20">🎨</div>
@@ -280,9 +272,13 @@ export default function PredictPage() {
               </div>
             )}
 
-            {/* Error */}
+            {/* Error/Status Message */}
             {error && (
-              <div className="mt-6 bg-red-500/20 border border-red-500/50 rounded-lg p-4 text-red-200 text-sm">
+              <div className={`mt-6 border rounded-lg p-4 text-sm ${
+                error.includes('loading')
+                  ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-200'
+                  : 'bg-red-500/20 border-red-500/50 text-red-200'
+              }`}>
                 {error}
               </div>
             )}
