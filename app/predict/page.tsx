@@ -20,7 +20,8 @@ export default function PredictPage() {
   const captureIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const [lastCaptureTime, setLastCaptureTime] = useState(0)
 
-  const API_BASE = 'http://localhost:8000'
+  // Use environment variable for API URL, fallback to localhost for development
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
   // Initialize webcam
   useEffect(() => {
