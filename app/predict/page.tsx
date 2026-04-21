@@ -20,7 +20,7 @@ export default function PredictPage() {
   const captureIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const [lastCaptureTime, setLastCaptureTime] = useState(0)
 
-  const API_BASE = 'http://localhost:8001'
+  const API_BASE = 'http://localhost:8000'
 
   // Initialize webcam
   useEffect(() => {
@@ -52,7 +52,13 @@ export default function PredictPage() {
   useEffect(() => {
     const loadHomeImage = async () => {
       try {
-        const response = await fetch(`${API_BASE}/api/home-image`)
+        const response = await fetch(`${API_BASE}/api/home-image`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+          },
+        })
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
         const data = await response.json()
         if (data.image) {
           setHomeImage(`data:image/jpeg;base64,${data.image}`)
@@ -60,6 +66,7 @@ export default function PredictPage() {
         }
       } catch (err) {
         console.error('Error loading home image:', err)
+        setError('Failed to connect to backend server')
       }
     }
     loadHomeImage()
@@ -89,6 +96,19 @@ export default function PredictPage() {
             method: 'POST',
             body: formData
           })
+
+          if (!response.ok) {
+            console.error(`HTTP Error: ${response.status} ${response.statusText}`)
+            try {
+              const errorData = await response.json()
+              console.error('Backend error:', errorData)
+              setError(`Backend error: ${errorData.detail || response.statusText}`)
+            } catch (e) {
+              setError(`Backend error: HTTP ${response.status}`)
+            }
+            setLoading(false)
+            return
+          }
 
           const data = await response.json()
 
@@ -181,98 +201,96 @@ export default function PredictPage() {
       </header>
 
       {/* Main Content */}
-      <div className="absolute inset-0 z-10 flex items-center justify-center pt-20 pb-0">
-        <div className="w-full h-full flex items-center justify-center px-6">
-          {/* Anime Display - Left */}
-          <div className="flex-1 flex items-center justify-center">
-            <div className="relative">
-              {animeImage ? (
-                <img
-                  src={animeImage}
-                  alt="Anime character"
-                  className="max-h-96 max-w-md object-contain drop-shadow-2xl"
-                />
-              ) : (
-                <div className="text-8xl opacity-20">🎨</div>
-              )}
+      <div className="absolute inset-0 z-10 pt-20 px-6 flex flex-col md:flex-row md:items-center">
+        {/* Anime Display - Top on Mobile, Left on Desktop */}
+        <div className="md:absolute md:top-24 md:left-6 w-full md:w-auto flex justify-center md:block mb-8 md:mb-0">
+          <div className="relative">
+            {animeImage ? (
+              <img
+                src={animeImage}
+                alt="Anime character"
+                className="max-h-64 md:max-h-80 max-w-xs object-contain drop-shadow-2xl"
+              />
+            ) : (
+              <div className="text-8xl opacity-20">🎨</div>
+            )}
 
-              {/* Loading Spinner */}
-              {loading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg backdrop-blur-sm">
-                  <div className="text-center">
-                    <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-white font-semibold">Analyzing...</p>
-                  </div>
+            {/* Loading Spinner */}
+            {loading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg backdrop-blur-sm">
+                <div className="text-center">
+                  <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
+                  <p className="text-white font-semibold">Analyzing...</p>
                 </div>
-              )}
-            </div>
-          </div>
-
-          {/* Results Panel - Right */}
-          <div className="flex-1 max-w-md">
-            <div className="bg-black/50 backdrop-blur-xl border border-white/20 rounded-3xl p-8">
-              {emotion ? (
-                <>
-                  {/* Emotion Name */}
-                  <h2 className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 mb-6 text-center uppercase">
-                    {emotion}
-                  </h2>
-
-                  {/* Confidence Bar */}
-                  <div className="mb-8">
-                    <div className="flex justify-between items-center mb-3">
-                      <span className="text-white/80 font-semibold">Confidence</span>
-                      <span className="text-2xl font-bold text-white">{Math.round(confidence * 100)}%</span>
-                    </div>
-                    <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-500"
-                        style={{ width: `${confidence * 100}%` }}
-                      ></div>
-                    </div>
-                  </div>
-
-                  {/* Probabilities */}
-                  {probabilities.length > 0 && (
-                    <div className="border-t border-white/10 pt-6">
-                      <h4 className="text-xs font-bold uppercase text-white/60 mb-4 tracking-wider">All Emotions</h4>
-                      <div className="space-y-3">
-                        {probabilities.map((item) => (
-                          <div key={item.emotion} className="flex items-center gap-3">
-                            <span className="text-sm font-semibold text-white/80 w-16">{item.emotion}</span>
-                            <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-500"
-                                style={{ width: `${item.probability * 100}%` }}
-                              ></div>
-                            </div>
-                            <span className="text-sm font-bold text-white/90 w-10 text-right">{item.percentage}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-2xl mb-2">📸</p>
-                  <p className="text-white font-semibold mb-2">Waiting for face detection...</p>
-                  <p className="text-white/60 text-sm">Show your face to the camera</p>
-                </div>
-              )}
-
-              {/* Error */}
-              {error && (
-                <div className="mt-6 bg-red-500/20 border border-red-500/50 rounded-lg p-4 text-red-200 text-sm">
-                  {error}
-                </div>
-              )}
-
-              {/* Capture Indicator */}
-              <div className="mt-8 flex items-center justify-center gap-2 text-white/60 text-xs">
-                <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
-                <span>Next capture in {CAPTURE_INTERVAL / 1000}s</span>
               </div>
+            )}
+          </div>
+        </div>
+
+        {/* Results Panel - Bottom on Mobile, Right Side on Desktop */}
+        <div className="md:absolute md:right-6 md:top-1/2 md:transform md:-translate-y-1/2 w-full sm:max-w-sm md:w-auto md:max-w-md mt-auto md:mt-0 self-center md:self-auto">
+          <div className="bg-black/50 backdrop-blur-xl border border-white/20 rounded-3xl p-6 md:p-8">
+            {emotion ? (
+              <>
+                {/* Emotion Name */}
+                <h2 className="text-3xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 mb-4 md:mb-6 text-center uppercase">
+                  {emotion}
+                </h2>
+
+                {/* Confidence Bar - Desktop Only */}
+                <div className="hidden md:block mb-8">
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-white/80 font-semibold">Confidence</span>
+                    <span className="text-2xl font-bold text-white">{Math.round(confidence * 100)}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-500"
+                      style={{ width: `${confidence * 100}%` }}
+                    ></div>
+                  </div>
+                </div>
+
+                {/* Probabilities - Desktop Only */}
+                {probabilities.length > 0 && (
+                  <div className="hidden md:block border-t border-white/10 pt-6">
+                    <h4 className="text-xs font-bold uppercase text-white/60 mb-4 tracking-wider">All Emotions</h4>
+                    <div className="space-y-3">
+                      {probabilities.map((item) => (
+                        <div key={item.emotion} className="flex items-center gap-3">
+                          <span className="text-sm font-semibold text-white/80 w-16">{item.emotion}</span>
+                          <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-500"
+                              style={{ width: `${item.probability * 100}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-sm font-bold text-white/90 w-10 text-right">{item.percentage}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-2xl mb-2">📸</p>
+                <p className="text-white font-semibold mb-2">Waiting for face detection...</p>
+                <p className="text-white/60 text-sm">Show your face to the camera</p>
+              </div>
+            )}
+
+            {/* Error */}
+            {error && (
+              <div className="mt-6 bg-red-500/20 border border-red-500/50 rounded-lg p-4 text-red-200 text-sm">
+                {error}
+              </div>
+            )}
+
+            {/* Capture Indicator */}
+            <div className="mt-4 md:mt-8 flex items-center justify-center gap-2 text-white/60 text-xs">
+              <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
+              <span>Next capture in {CAPTURE_INTERVAL / 1000}s</span>
             </div>
           </div>
         </div>
